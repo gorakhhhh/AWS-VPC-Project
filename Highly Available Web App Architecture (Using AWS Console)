@@ -1,0 +1,139 @@
+#This project demonstrates the creation of a scalable and highly available architecture in AWS using the AWS
+Management Console, including:
+1.VPC with 2 Availability Zones
+2.Public and Private Subnets
+3.NAT Gateways
+4.Bastion Host
+5.Application Load Balancer (ALB)
+6.Auto Scaling Group (ASG)
+7. HTML application on private EC2
+
+@Step 1: Create VPC and Subnets
+1)Go to VPC Dashboard → Your VPCs → Create VPC
+
+2)Name: MyVPC
+
+3)IPv4 CIDR block: 10.0.0.0/16
+
+4)Go to Subnets → Create Subnet
+
+5)Create 4 subnets:
+ -Public Subnet AZ-a: 10.0.1.0/24
+ -Public Subnet AZ-b: 10.0.2.0/24
+ -Private Subnet AZ-a: 10.0.11.0/24
+ -Private Subnet AZ-b: 10.0.12.0/24
+
+6)Ensure each subnet is placed in a different Availability Zone
+
+@Step 2: Setup Internet Gateway and Route Tables
+1)Go to Internet Gateways → Create Internet Gateway
+
+2)Attach it to your VPC
+
+3)Go to Route Tables → Create route table
+
+4)Associate with public subnets
+
+5)Add a route: 0.0.0.0/0 → Internet Gateway
+
+@Step 3: Create NAT Gateways for Private Subnets
+1)Go to Elastic IPs → Allocate Elastic IP address (do this twice)
+
+2)Go to NAT Gateways → Create NAT Gateway
+
+3)Place one in each public subnet
+
+4)Attach each to one of the allocated EIPs
+
+5)Go to Route Tables → Create one route table per private subnet
+
+6)Add a route: 0.0.0.0/0 → NAT Gateway (in same AZ)
+
+7)Associate with the private subnet
+
+@Step 4: Create Security Groups
+1)ALB Security Group
+
+2)Inbound: HTTP (80) from 0.0.0.0/0
+
+3)EC2 Private Security Group
+
+4)Inbound: HTTP (80) from ALB SG
+
+5)Inbound: SSH (22) from Bastion SG
+
+6)Bastion Security Group
+
+7)Inbound: SSH (22) from your IP
+
+@Step 5: Launch EC2 Instances via Auto Scaling
+1)Go to Launch Templates → Create launch template
+
+2)Use Amazon Linux 2 or Ubuntu AMI
+
+3)Add user data script:
+#!/bin/bash
+yum install httpd -y
+systemctl start httpd
+echo "<h1>Hello from Auto Scaling EC2</h1>" > /var/www/html/index.html
+
+
+4)Go to Auto Scaling Groups → Create Auto Scaling group
+
+5)Use the launch template
+
+6)Set:
+Min: 1
+Desired: 2
+Max: 4
+
+7)Select both private subnets
+
+8)Attach to Target Group (create in next step)
+
+@Step 6: Launch Bastion Host
+1)Go to EC2 Dashboard → Launch Instance
+
+2)AMI: Amazon Linux 2
+
+3)Instance type: t2.micro
+
+4)Key pair: Choose/create one
+
+5)Subnet: Public Subnet AZ-a
+
+6)Security Group: Bastion SG
+
+7)Access private EC2 from Bastion:
+ssh -i your-key.pem ec2-user@<bastion-public-ip>
+ssh ec2-user@<private-ec2-ip>
+
+
+@Step 7: Create Application Load Balancer
+1)Go to EC2 → Load Balancers → Create Load Balancer
+
+2)Type: Application Load Balancer
+
+3)Scheme: Internet-facing
+
+4)Subnets: Public Subnet AZ-a and AZ-b
+
+5)Security Group: ALB SG
+
+6)Create Target Group
+
+7)Target type: instance
+
+8)Protocol: HTTP, Port: 80
+
+9)Register instances (Auto Scaling Group will auto-register if attached)
+
+10)Create Listener
+Protocol: HTTP
+Port: 80
+Forward to: Target Group
+
+@Step 8: Test the Application
+OPEN BROWSER: http://<ALB-DNS>
+You should see: Hello from Auto Scaling EC2
+
